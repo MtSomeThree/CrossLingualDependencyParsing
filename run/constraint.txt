@@ -1,0 +1,2 @@
+NOUN ADP
+NOUN ADJ
