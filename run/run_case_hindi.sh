@@ -10,15 +10,15 @@ cur_lang=$1
 
 # try them both, will fail on one
 
-CUDA_VISIBLE_DEVICES=0 python ../src/examples/analyze.py --parser biaffine --ordered --gpu \
+CUDA_VISIBLE_DEVICES=6 python ../src/examples/analyze.py --parser biaffine --ordered --gpu \
 --punctuation 'PUNCT' 'SYM' --out_filename analyzer.$cur_lang.out --model_name 'network.pt' \
 --test "../data2.2/${cur_lang}_test.conllu" --model_path "./model/final_gtrans.sh_1/" --extra_embed "../data2.2/wiki.multi.${cur_lang}.vec" \
---decode mst --constraints_method PR --constraint_file "./constraints2.txt" --ratio_file "./model/constraints/${cur_lang}.constraint" --mt_log "./log/${cur_lang}.log" --tolerance 1.0 \
---summary_log "./summary.log"
+--decode proj --constraints_method Lagrange --constraint_file "WALS_extra.pkl" --ratio_file "WALS" --mt_log "./log_he/${cur_lang}.log" --tolerance 0.01 \
+--summary_log 'summary.log' --gamma 1
 
 }
 
-for lang in cs de pl bg lv la et sv sl da no nl sk;
+for lang in tr ur cy ta
 do
     run_lang $lang;
 done

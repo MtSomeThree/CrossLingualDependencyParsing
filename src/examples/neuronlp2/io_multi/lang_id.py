@@ -2,7 +2,7 @@ import os
 
 # todo(warn): guess language id from filenames
 # the ids should be lowercased!!
-KNOWN_LANG_IDS = {'ar', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl', 'en', 'et', 'fi', 'fr', 'de', 'he', 'hi', 'id', 'it', 'ja', 'ko', 'la', 'lv', 'no', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'es', 'sv', 'uk'}
+KNOWN_LANG_IDS = {'ar', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl', 'en', 'et', 'fi', 'fr', 'de', 'he', 'hi', 'id', 'it', 'ja', 'ko', 'la', 'lv', 'no', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'es', 'sv', 'uk', 'ur', 'tl', 'tr', 'ta', 'cy'}
 def guess_language_id(file_path):
     bname = os.path.basename(file_path)
     lang_id = str.lower(bname[:2])

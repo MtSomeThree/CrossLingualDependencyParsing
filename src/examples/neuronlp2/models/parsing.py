@@ -1,5 +1,6 @@
 __author__ = 'max'
 
+import random
 import math
 import copy
 import numpy as np
@@ -301,7 +302,7 @@ class BiRecurrentConvBiAffine(nn.Module):
 
         return heads.cpu().numpy(), types.data.cpu().numpy()
 
-    def decode_mst(self, input_word, input_char, input_pos, mask=None, length=None, hx=None, leading_symbolic=0, constraints=None, method='Lagrange'):
+    def decode_mst(self, input_word, input_char, input_pos, mask=None, length=None, hx=None, leading_symbolic=0, constraints=None, method='Lagrange', gamma=1.0):
         '''
         Args:
             input_word: Tensor
@@ -362,7 +363,7 @@ class BiRecurrentConvBiAffine(nn.Module):
         energy = loss_arc.unsqueeze(1) + loss_type
         return parser.decode_MST(energy.data.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
     
-    def decode_proj(self, input_word, input_char, input_pos, mask=None, length=None, hx=None, leading_symbolic=0, constraints=None, method='Lagrange'):
+    def decode_proj(self, input_word, input_char, input_pos, mask=None, length=None, hx=None, leading_symbolic=0, constraints=None, method='Lagrange', gamma=1.0):
         '''
         Args:
             input_word: Tensor
@@ -422,7 +423,7 @@ class BiRecurrentConvBiAffine(nn.Module):
         if method == 'Lagrange' or method == 'PR':
 	    if constraints is not None:
                 for constraint in constraints:
-                    loss_arc = self.apply_constraints(loss_arc, input_pos, constraint, method)
+                    loss_arc = self.apply_constraints(loss_arc, input_pos, constraint, method, gamma)
         #energy = torch.exp(loss_arc.unsqueeze(1) + loss_type)
         energy = loss_arc.unsqueeze(1) + loss_type
         return parser.decode_proj(energy.data.cpu().numpy(), length, leading_symbolic=leading_symbolic, labeled=True)
@@ -450,7 +451,7 @@ class BiRecurrentConvBiAffine(nn.Module):
 
         return out_arc, out_type, length
 
-    def PR_constraints(self, out_arc, out_type, length, pos, constraints, tolerance, mt_log):
+    def PR_constraints(self, out_arc, out_type, length, pos, constraints, tolerance, mt_log, gamma=1.0):
         N = len(out_arc)
         temp = np.zeros(1, dtype='uint8')
         M = len(constraints)
@@ -458,6 +459,7 @@ class BiRecurrentConvBiAffine(nn.Module):
         sat_con = [0] * M
         ratio = [0.0] * M
         #First pass to decide the constraints directions
+        
         for i in range(N):
             loss_arc = F.log_softmax(out_arc[i].unsqueeze(0), dim = 1)
             loss_type = F.log_softmax(out_type[i], dim = 2).permute(2, 0, 1).unsqueeze(0)
@@ -469,24 +471,57 @@ class BiRecurrentConvBiAffine(nn.Module):
                 total[idx] += tot
                 sat_con[idx] += con
         print ("Number of Instance: %d\n"%(N)) 
+        
         for i, constraint in enumerate(constraints):
             ratio[i] = float(sat_con[i]) / total[i]
+            '''
             if ratio[i] < constraint.ratio:
                 constraint.direction = -1
+                constraint.ratio -= tolerance
             else:
                 constraint.direction = 1
-            constraint.output()
+                constraint.ratio += tolerance
+            '''
+            constraint.output(data=ratio[i])
+        
         #apply gradient descent to find the lambda
-        learning_rate = 1e-5
-        lr_decay = 0.9
-        while learning_rate > 1e-6:
+        learning_rate = 1
+        lr_decay = 0.98
+        first_order_sum = [0.0] * M
+        second_order_sum = [0.0] * M
+        alpha = 0.9
+        beta = 0.999
+        start_point = N
+        scores = []
+        ids = np.array(range(N))
+        batch_num = 0
+        epsilon = 1e-6
+        for i in range(N):
+            loss_arc = F.log_softmax(out_arc[i], dim = 0)
+            loss_type = F.log_softmax(out_type[i], dim = 2).permute(2, 0, 1).max(dim = 0)[0]
+            exp_potential = torch.exp((loss_arc + loss_type) / gamma)
+            normal_term = torch.log(exp_potential.sum(dim = 0))
+            score = (loss_arc + loss_type) / gamma - normal_term
+            scores.append(score.data.cpu().numpy())
+
+        train_batch_size = 128
+        for epoch in range(100):
             logZ = 0.0
             gradientZ = [0.0] * M
-            for i in range(N):
-                loss_arc = F.log_softmax(out_arc[i], dim = 0)
-                loss_type = F.log_softmax(out_type[i], dim = 2).permute(2, 0, 1)
-                score_matrix = loss_arc.data.cpu().numpy()
+            start_point += train_batch_size
+            if start_point + train_batch_size >= N:
+                random.shuffle(ids)
+                start_point = 0
+            batch_num += 1
+            if train_batch_size > N:
+                train_batch_size = N
+            for idx in range(start_point, start_point + train_batch_size):
+                i = ids[idx]
+                #loss_arc = F.log_softmax(out_arc[i], dim = 0)
+                #loss_type = F.log_softmax(out_type[i], dim = 2).permute(2, 0, 1)
+                #score_matrix = loss_arc.data.cpu().numpy()
                 #print (score_matrix.shape, length[i])
+                score_matrix = scores[i]
                 for j in range(length[i]):
                     sum0 = 0.0
                     sum1 = [0.0] * M
@@ -497,7 +532,7 @@ class BiRecurrentConvBiAffine(nn.Module):
                         temp = score_matrix[k, j]
                         #print ("score_matrix=%f\n"%(score_matrix[j, k]))
                         for constraint in constraints:
-                            temp -= constraint.PROffset(constraint.pair_count(pos[i].data[j], pos[i].data[k], j, k))
+                            temp += constraint.PROffset(constraint.pair_count(pos[i].data[j], pos[i].data[k], j, k))
                         #print ("temp=%f\n"%(temp))
                         for idx, constraint in enumerate(constraints):
                             sum1[idx] -= constraint.PRFunction(constraint.pair_count(pos[i].data[j], pos[i].data[k], j, k)) * math.exp(temp)
@@ -506,16 +541,28 @@ class BiRecurrentConvBiAffine(nn.Module):
                         gradientZ[idx] += sum1[idx] / sum0
                     #print ("sum0=%.4f"%(sum0))
                     logZ += math.log(sum0)
+                    #print (logZ)
             print (logZ)
+            factors_print = []
             for idx, constraint in enumerate(constraints):
-                gradientZ[idx] *= math.exp(logZ)
-                constraint.weightFactor -= gradientZ[idx] * learning_rate
+                #gradientZ[idx] *= math.exp(logZ)
+                #momentum[idx] = momentum[idx] * discount + gradientZ[idx]
+                first_order_sum[idx] = first_order_sum[idx] * alpha + (1.0 - alpha) * gradientZ[idx]
+                second_order_sum[idx] = second_order_sum[idx] * beta + (1.0 - beta) * gradientZ[idx] * gradientZ[idx]
+                first_order_mean = first_order_sum[idx] / (1.0 - pow(alpha, batch_num))
+                second_order_mean = second_order_sum[idx] / (1.0 - pow(beta, batch_num))
+                constraint.weightFactor -= first_order_mean / (math.sqrt(second_order_mean) + epsilon) * learning_rate
                 if constraint.weightFactor < 0:
                     constraint.weightFactor = 0
+                factors_print.append(constraint.weightFactor)
             print (gradientZ)
+            print (factors_print)
             learning_rate *= lr_decay
 
-    def Lagrange_constraints(self, out_arc, out_type, length, pos, constraints, tolerance, mt_log):
+        for i, constraint in enumerate(constraints):
+            constraint.output_to_file(mt_log, ratio[i])
+
+    def Lagrange_constraints(self, out_arc, out_type, length, pos, constraints, tolerance, mt_log, gamma=0):
         temp = np.zeros(1, dtype='uint8')
         N = len(out_arc)
         alpha = 50.0
@@ -540,7 +587,7 @@ class BiRecurrentConvBiAffine(nn.Module):
             flag = True
             for i, constraint in enumerate(constraints):
                 ratio[i] = float(sat_con[i]) / total[i]
-                if abs(ratio[i] - constraint.ratio) > tolerance:
+                if abs(ratio[i] - constraint.ratio) > constraint.margin:
                     flag = False
                 constraint.output(ratio[i])
                 #constraint.weightFactor += alpha * (constraint.ratio - ratio[i])
@@ -647,7 +694,7 @@ class BiRecurrentConvBiAffine(nn.Module):
             print(total, sat_con, ratio, total_weightShift)
         constraint.Factor = total_weightShift
     
-    def apply_constraints(self, arc, pos, constraint, method='Lagrange'):
+    def apply_constraints(self, arc, pos, constraint, method='Lagrange', gamma=1.0):
         #print ("The shapes:", arc.shape, pos.shape, constraints)
         batch = arc.shape[0]
         length = arc.shape[1]
@@ -677,8 +724,8 @@ class BiRecurrentConvBiAffine(nn.Module):
                         continue
 
                     if method == 'PR':
-                        arc.data[i, k, j] = arc.data[i, k, j] + constraint.PROffset(constraint.pair_count(pos.data[i, j], pos.data[i, k], j, k))
-                        arc.data[i, j, k] = arc.data[i, j, k] + constraint.PROffset(constraint.pair_count(pos.data[i, k], pos.data[i, j], k, j))
+                        arc.data[i, k, j] = arc.data[i, k, j] + gamma * constraint.PROffset(constraint.pair_count(pos.data[i, j], pos.data[i, k], j, k))
+                        arc.data[i, j, k] = arc.data[i, j, k] + gamma * constraint.PROffset(constraint.pair_count(pos.data[i, k], pos.data[i, j], k, j))
                         continue
 
                     if constraint.leftPos == constraint.rightPos:

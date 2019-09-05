@@ -56,6 +56,7 @@ def main():
     args_parser.add_argument('--ratio_file', type=str)    
     args_parser.add_argument('--mt_log', type=str)
     args_parser.add_argument('--summary_log', type=str)
+    args_parser.add_argument('--gamma', type=float, default=1)
 
     args = args_parser.parse_args()
 
@@ -163,6 +164,8 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
     constraintFile = args.constraint_file
     ratioFile = args.ratio_file
     tolerance = args.tolerance
+    gamma = args.gamma
+    the_language = args.mt_log[9:11]
     mt_log = open(args.mt_log, 'a')
     summary_log = open(args.summary_log, 'a')
     logger.info('use gpu: %s, decoding: %s' % (use_gpu, decoding))
@@ -228,16 +231,35 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
 
     constraints = []
     
-    mt_log.write("=====================%s, non-proj base================\n"%(constraints_method))
-    summary_log.write("==========================%s, non-proj base=============\n"%(constraints_method))
-    cFile = open(constraintFile, 'r')
-    for line in cFile:
-        if len(line.strip()) < 2:
-            break
-        pos1, pos2 = line.strip().split('\t')
+    mt_log.write("=====================%s, Ablation 2================\n"%(constraints_method))
+    summary_log.write("==========================%s, Ablation 2=============\n"%(constraints_method))
+    if ratioFile == 'WALS':
+        import pickle as pk
+        cFile = open(constraintFile, 'rb')
+        WALS_data = pk.load(cFile)
+        for idx in ['85A', '87A', '89A']:
+            constraint = Constraint(0,0,0)
+            extra_const = constraint.load_WALS(idx, WALS_data[the_language][idx], pos_alphabet, method=constraints_method)
+            constraints.append(constraint)
+            if extra_const:
+                constraints.append(extra_const)
         constraint = Constraint(0,0,0)
-        constraint.load(pos1, pos2, ratioFile, pos_alphabet)
+        extra_const = constraint.load_WALS_unary(WALS_data[the_language], pos_alphabet, method=constraints_method4)
+        if extra_const:
+            constraints.append(extra_const)
         constraints.append(constraint)
+    elif ratioFile == 'None':
+        summary_log.write("=================No it is baseline================\n")
+        mt_log.write("==================No it is baseline==============\n")
+    else:
+        cFile = open(constraintFile, 'r')
+        for line in cFile:
+            if len(line.strip()) < 2:
+               break
+            pos1, pos2 = line.strip().split('\t')
+            constraint = Constraint(0,0,0)
+            constraint.load(pos1, pos2, ratioFile, pos_alphabet)
+            constraints.append(constraint)
     
     test_ucorrect = 0.0
     test_lcorrect = 0.0
@@ -273,7 +295,7 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
         train_constraints = network.Lagrange_constraints
     if constraints_method == 'PR':
         train_constraints = network.PR_constraints
-    train_constraints(arc_list, type_list, length_list, pos_list, constraints, tolerance, mt_log)        
+    train_constraints(arc_list, type_list, length_list, pos_list, constraints, tolerance, mt_log, gamma=gamma)        
 
     for batch in conllx_data.iterate_batch_variable(data_test, 1):
         #sys.stdout.write('%d, ' % sent)
@@ -282,7 +304,7 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
 
         word, char, pos, heads, types, masks, lengths = batch
         heads_pred, types_pred = decode(word, char, pos, mask=masks, length=lengths,
-                                        leading_symbolic=conllx_data.NUM_SYMBOLIC_TAGS, constraints=constraints, method=constraints_method)
+                                        leading_symbolic=conllx_data.NUM_SYMBOLIC_TAGS, constraints=constraints, method=constraints_method, gamma=gamma)
         word = word.data.cpu().numpy()
         pos = pos.data.cpu().numpy()
         lengths = lengths.cpu().numpy()
@@ -327,7 +349,7 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
     print('test Root: corr: %d, total: %d, acc: %.2f%%' % (
         test_root_correct, test_total_root, test_root_correct * 100 / test_total_root))
     mt_log.write('uas: %.2f, las: %.2f\n'%(test_ucorrect_nopunc * 100 / test_total_nopunc, test_lcorrect_nopunc * 100 / test_total_nopunc))
-    summary_log.write('%s: %.2f %.2f\n'%(args.mt_log, test_ucorrect_nopunc * 100 / test_total_nopunc, test_lcorrect_nopunc * 100 / test_total_nopunc))
+    summary_log.write('%s: %.2f %.2f\n'%(the_language, test_ucorrect_nopunc * 100 / test_total_nopunc, test_lcorrect_nopunc * 100 / test_total_nopunc))
     pred_writer.close()
     gold_writer.close()
 
