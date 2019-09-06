@@ -1,6 +1,6 @@
 # Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing
-Here we have the code and models for the following paper
-[Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing](https://arxiv.org/abs/1909.01482) by Tao Meng, Nanyun Peng and Kai-Wei Chang published in EMNLP 2019.
+This repository contains the source code to reproduce the experiments in the EMNLP 2019 paper
+[Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing](https://arxiv.org/abs/1909.01482) by Tao Meng, [Nanyun Peng](http://www.cs.jhu.edu/~npeng/) and [Kai-Wei Chang](http://web.cs.ucla.edu/~kwchang/).
 
 **This repository is still under construction**
 
@@ -12,14 +12,27 @@ Prior work on cross-lingual dependency parsing often focuses on capturing the co
 Firstly, you should download the UD Tree Bank data from [Universal Dependencies v2](https://universaldependencies.org/) (.conllu files),
 and multilingual embedding data from [FastText](https://fasttext.cc/docs/en/crawl-vectors.html) (.vec files) and save them in ./data2.2 first. Now in ./data2.2 we only have dummy files of Hebrew(he).
 
-- ### 
+- ### Running experiments
 
-- ### Run the experiments
+**Requirements**
+
+```bash
+python == 2.7
+pytorch == 0.3.1
+```
 
 **WALS settings**
 
 To use WALS features to compile constraints, please refer to ./run/run_WALS.sh. The WALS is stored in pickle file WALS_extra.pkl. The model will automatically load the WALS features and compile them into C1,C2,C3 three corpus-wise constraints mentioned in paper.
 
+```bash
+./run/run_WALS.sh
+```
+
 **oracle settings**
 
 To use oracle settings, please refer to ./run/run_ratio.sh. It will load constraints in constraints.txt. The exact ratio is stored in ./run/model/constraint
+
+```bash
+./run/run_ratio.sh
+```
