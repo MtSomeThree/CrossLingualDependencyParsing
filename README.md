@@ -9,7 +9,10 @@ Prior work on cross-lingual dependency parsing often focuses on capturing the co
 
 - ### Data
 
-You should download the UD Tree Bank and multilingual embedding data from PLACEHOLDER and save them in ./data2.2 first. 
+Firstly, you should download the UD Tree Bank data from [Universal Dependencies v2](https://universaldependencies.org/) (.conllu files),
+and multilingual embedding data from [FastText](https://fasttext.cc/docs/en/crawl-vectors.html) (.vec files) and save them in ./data2.2 first. Now in ./data2.2 we only have dummy files of Hebrew(he).
+
+- ### 
 
 - ### Run the experiments
 
