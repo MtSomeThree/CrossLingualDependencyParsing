@@ -1,6 +1,6 @@
 # Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing
 This repository contains the source code to reproduce the experiments in the EMNLP 2019 paper
-[Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing](https://arxiv.org/abs/1909.01482) by Tao Meng, [Nanyun Peng](http://www.cs.jhu.edu/~npeng/) and [Kai-Wei Chang](http://web.cs.ucla.edu/~kwchang/) published in EMNLP 2019.
+[Target Language-Aware Constrained Inference for Cross-lingual Dependency Parsing](https://arxiv.org/abs/1909.01482) by Tao Meng, [Nanyun Peng](http://www.cs.jhu.edu/~npeng/) and [Kai-Wei Chang](http://web.cs.ucla.edu/~kwchang/).
 
 **This repository is still under construction**
 
@@ -13,6 +13,13 @@ Firstly, you should download the UD Tree Bank data from [Universal Dependencies 
 and multilingual embedding data from [FastText](https://fasttext.cc/docs/en/crawl-vectors.html) (.vec files) and save them in ./data2.2 first. Now in ./data2.2 we only have dummy files of Hebrew(he).
 
 - ### Running experiments
+
+**Requirements**
+
+```bash
+python == 2.7
+pytorch == 0.3.1
+```
 
 **WALS settings**
 
