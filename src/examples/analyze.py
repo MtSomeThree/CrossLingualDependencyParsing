@@ -244,7 +244,7 @@ def biaffine(model_path, model_name, test_path, punct_set, use_gpu, logger, args
             if extra_const:
                 constraints.append(extra_const)
         constraint = Constraint(0,0,0)
-        extra_const = constraint.load_WALS_unary(WALS_data[the_language], pos_alphabet, method=constraints_method4)
+        extra_const = constraint.load_WALS_unary(WALS_data[the_language], pos_alphabet, method=constraints_method)
         if extra_const:
             constraints.append(extra_const)
         constraints.append(constraint)
