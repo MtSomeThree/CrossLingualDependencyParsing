@@ -27,12 +27,12 @@ To use WALS features to compile constraints, please refer to ./run/run_WALS.sh. 
 ./run/run_WALS.sh
 ```
 
-'''bash
+```bash
 Alternative arguments:
   --decode [proj/mst]     adding projective constraints or not
   --constraints_method [PR/Lagrange] 
                           algorithms
-'''
+```
 
 
 **oracle settings**
@@ -43,8 +43,8 @@ To use oracle settings, please refer to ./run/run_ratio.sh. It will load constra
 ./run/run_ratio.sh
 ```
 
-'''bash
+```bash
 Alternative arguments:
   --decode [proj/mst]     adding projective constraints or not
   --threshold THETA       the margin
-'''
+```
